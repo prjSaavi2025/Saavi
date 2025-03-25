@@ -40,6 +40,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     // ✅ Fix for "META-INF/INDEX.LIST" error
