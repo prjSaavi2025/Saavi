@@ -42,7 +42,7 @@ android {
     }
 
     // ✅ Fix for "META-INF/INDEX.LIST" error
-    packagingOptions {
+    packaging {
         resources {
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/DEPENDENCIES"
@@ -79,6 +79,10 @@ dependencies {
     // ✅ Material Icons for UI Enhancements
     implementation("androidx.compose.material:material-icons-core:1.7.8")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
+
+    // to store and retrieve the selected language.
+    implementation("androidx.datastore:datastore-preferences:1.1.3")
+
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
