@@ -3,29 +3,31 @@ package com.saavi.saavi
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.compose.rememberLauncherForActivityResult // ✅ Fixed Import
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview // ✅ Correct Import for CameraX Preview
+import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
 import androidx.core.content.ContextCompat
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -57,6 +59,25 @@ fun MainScreen() {
         )
     }
     var showCamera by remember { mutableStateOf(false) }
+    var selectedLanguage by remember { mutableStateOf("Malayalam") }
+
+    // ✅ Fix: Use mutableStateOf<TextToSpeech?> to avoid reference errors
+    val tts = remember { mutableStateOf<TextToSpeech?>(null) }
+
+    // ✅ Initialize TTS inside LaunchedEffect
+    LaunchedEffect(Unit) {
+        tts.value = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts.value?.language = when (selectedLanguage) {
+                    "English" -> Locale.ENGLISH
+                    "Malayalam" -> Locale("ml")
+                    "Hindi" -> Locale("hi")
+                    "Kannada" -> Locale("kn")
+                    else -> Locale.ENGLISH
+                }
+            }
+        }
+    }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -64,14 +85,12 @@ fun MainScreen() {
         hasPermission = isGranted
     }
 
-    // ✅ Only request permission if it's not granted already
     LaunchedEffect(Unit) {
         if (!hasPermission) {
             requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
-    // ✅ Show the correct screen immediately
     when {
         !hasPermission -> {
             Box(
@@ -89,12 +108,34 @@ fun MainScreen() {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Text(text = "Select Language:")
+
+                DropdownMenuBox(selectedLanguage) { newLanguage ->
+                    selectedLanguage = newLanguage
+                    tts.value?.language = when (newLanguage) {
+                        "Malayalam" -> Locale("ml")
+                        "Hindi" -> Locale("hi")
+                        "Kannada" -> Locale("kn")
+                        else -> Locale.ENGLISH
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Box(
                     modifier = Modifier
                         .size(200.dp)
-                        .clip(RoundedCornerShape(16.dp)) // ✅ Rounded edges
+                        .clip(RoundedCornerShape(16.dp))  // ✅ Fix: clip should be inside Modifier
                         .background(Color.Black)
-                        .clickable { showCamera = true },
+                        .clickable {
+                            tts.value?.speak(
+                                "Starting camera in $selectedLanguage",
+                                TextToSpeech.QUEUE_FLUSH,
+                                null,
+                                null
+                            )
+                            showCamera = true
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(text = "OPEN CAMERA", color = Color.White)
@@ -107,6 +148,25 @@ fun MainScreen() {
     }
 }
 
+@Composable
+fun DropdownMenuBox(selectedLanguage: String, onLanguageSelected: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val languages = listOf("English","Malayalam", "Hindi", "Kannada")
+
+    Box {
+        Button(onClick = { expanded = true }) {
+            Text(selectedLanguage)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            languages.forEach { language ->
+                DropdownMenuItem(text = { Text(language) }, onClick = {
+                    onLanguageSelected(language)
+                    expanded = false
+                })
+            }
+        }
+    }
+}
 
 @Composable
 fun CameraPreviewScreen() {
@@ -124,16 +184,16 @@ fun CameraPreviewScreen() {
 
                 cameraProviderFuture.addListener({
                     val cameraProvider = cameraProviderFuture.get()
-                    val preview = Preview.Builder().build() // ✅ Fixed Incorrect Usage
+                    val preview = Preview.Builder().build()
 
-                    preview.setSurfaceProvider(previewView.surfaceProvider) // ✅ Correct setter method
+                    preview.setSurfaceProvider(previewView.surfaceProvider)
 
                     val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
                     try {
                         cameraProvider.unbindAll()
                         cameraProvider.bindToLifecycle(
-                            context as ComponentActivity, cameraSelector, preview // ✅ Fixed Overload Issue
+                            context as ComponentActivity, cameraSelector, preview
                         )
                     } catch (exc: Exception) {
                         Log.e("Camera", "Failed to start camera", exc)
@@ -144,19 +204,5 @@ fun CameraPreviewScreen() {
             },
             modifier = Modifier.fillMaxSize()
         )
-    }
-}
-
-@Composable
-fun CameraScreen(modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    var isCameraActive by remember { mutableStateOf(false) }
-    var hasPermission by remember { mutableStateOf(false) }
-
-    // ✅ Fixed: Correct permission launcher usage
-    val requestPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted: Boolean ->
-        hasPermission = granted
     }
 }
