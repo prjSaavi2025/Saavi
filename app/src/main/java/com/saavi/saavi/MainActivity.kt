@@ -146,3 +146,17 @@ fun CameraPreviewScreen() {
         )
     }
 }
+
+@Composable
+fun CameraScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var isCameraActive by remember { mutableStateOf(false) }
+    var hasPermission by remember { mutableStateOf(false) }
+
+    // ✅ Fixed: Correct permission launcher usage
+    val requestPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted: Boolean ->
+        hasPermission = granted
+    }
+}
