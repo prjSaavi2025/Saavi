@@ -27,10 +27,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.launch
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var cameraExecutor: ExecutorService
@@ -54,87 +54,81 @@ class MainActivity : ComponentActivity() {
 fun MainScreen() {
     val context = LocalContext.current
     val preferencesManager = remember { PreferencesManager(context) }
-    var selectedLanguage by remember { mutableStateOf("Malayalam") }
     val coroutineScope = rememberCoroutineScope()
 
-    // ✅ Load saved language when the app starts
-    LaunchedEffect(Unit) {
-        preferencesManager.selectedLanguage.collect { savedLanguage ->
-            selectedLanguage = savedLanguage
+    // ✅ Restore showCamera state to switch screens
+    var showCamera by remember { mutableStateOf(false) }
+
+    // ✅ Load selected language (default: Malayalam)
+    val selectedLanguage by preferencesManager.selectedLanguage.collectAsState(initial = "Malayalam")
+
+    // ✅ Initialize TTS once
+    val tts = remember {
+        TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                Log.d("TTS", "Text-to-Speech initialized successfully")
+            }
         }
     }
 
-    // ✅ Initialize TTS once and update its language when needed
-    val tts = remember {
-        mutableStateOf<TextToSpeech?>(null)
+    // ✅ Update TTS language when selectedLanguage changes
+    LaunchedEffect(selectedLanguage) {
+        tts.language = when (selectedLanguage) {
+            "Malayalam" -> Locale("ml")
+            "Hindi" -> Locale("hi")
+            "Kannada" -> Locale("kn")
+            "English" -> Locale.ENGLISH
+            else -> Locale.ENGLISH
+        }
     }
 
-    LaunchedEffect(selectedLanguage) {
-        tts.value = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                tts.value?.language = when (selectedLanguage) {
-                    "Malayalam" -> Locale("ml")
-                    "Hindi" -> Locale("hi")
-                    "Kannada" -> Locale("kn")
-                    "English" -> Locale.ENGLISH
-                    else -> Locale.ENGLISH
+    // ✅ Show either the main screen or the camera screen
+    if (showCamera) {
+        CameraPreviewScreen()
+    } else {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = "Select Language:")
+
+            DropdownMenuBox(selectedLanguage) { newLanguage ->
+                coroutineScope.launch {
+                    preferencesManager.saveLanguage(newLanguage)
                 }
             }
-        }
-    }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = "Select Language:")
+            Spacer(modifier = Modifier.height(16.dp))
 
-        DropdownMenuBox(selectedLanguage) { newLanguage ->
-            selectedLanguage = newLanguage
-
-            // ✅ Save selected language to DataStore
-            coroutineScope.launch {
-                preferencesManager.saveLanguage(newLanguage)
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black)
+                    .clickable {
+                        // ✅ Speak the selected language
+                        tts.speak(
+                            "Starting camera in $selectedLanguage",
+                            TextToSpeech.QUEUE_FLUSH,
+                            null,
+                            null
+                        )
+                        // ✅ Show Camera Screen
+                        showCamera = true
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "OPEN CAMERA", color = Color.White)
             }
-
-            // ✅ Update TTS language dynamically
-            tts.value?.language = when (newLanguage) {
-                "Malayalam" -> Locale("ml")
-                "Hindi" -> Locale("hi")
-                "Kannada" -> Locale("kn")
-                "English" -> Locale.ENGLISH
-                else -> Locale.ENGLISH
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Box(
-            modifier = Modifier
-                .size(200.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.Black)
-                .clickable {
-                    tts.value?.speak(
-                        "Starting camera in $selectedLanguage",
-                        TextToSpeech.QUEUE_FLUSH,
-                        null,
-                        null
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = "OPEN CAMERA", color = Color.White)
         }
     }
 }
 
-
 @Composable
 fun DropdownMenuBox(selectedLanguage: String, onLanguageSelected: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    val languages = listOf("English","Malayalam", "Hindi", "Kannada")
+    val languages = listOf("English", "Malayalam", "Hindi", "Kannada")
 
     Box {
         Button(onClick = { expanded = true }) {
