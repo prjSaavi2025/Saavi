@@ -30,6 +30,7 @@ import androidx.core.content.ContextCompat
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var cameraExecutor: ExecutorService
@@ -52,101 +53,83 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen() {
     val context = LocalContext.current
-    var hasPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
-                    == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    var showCamera by remember { mutableStateOf(false) }
+    val preferencesManager = remember { PreferencesManager(context) }
     var selectedLanguage by remember { mutableStateOf("Malayalam") }
+    val coroutineScope = rememberCoroutineScope()
 
-    // ✅ Fix: Use mutableStateOf<TextToSpeech?> to avoid reference errors
-    val tts = remember { mutableStateOf<TextToSpeech?>(null) }
-
-    // ✅ Initialize TTS inside LaunchedEffect
+    // ✅ Load saved language when the app starts
     LaunchedEffect(Unit) {
+        preferencesManager.selectedLanguage.collect { savedLanguage ->
+            selectedLanguage = savedLanguage
+        }
+    }
+
+    // ✅ Initialize TTS once and update its language when needed
+    val tts = remember {
+        mutableStateOf<TextToSpeech?>(null)
+    }
+
+    LaunchedEffect(selectedLanguage) {
         tts.value = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts.value?.language = when (selectedLanguage) {
-                    "English" -> Locale.ENGLISH
                     "Malayalam" -> Locale("ml")
                     "Hindi" -> Locale("hi")
                     "Kannada" -> Locale("kn")
+                    "English" -> Locale.ENGLISH
                     else -> Locale.ENGLISH
                 }
             }
         }
     }
 
-    val requestPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        hasPermission = isGranted
-    }
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = "Select Language:")
 
-    LaunchedEffect(Unit) {
-        if (!hasPermission) {
-            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
-    }
+        DropdownMenuBox(selectedLanguage) { newLanguage ->
+            selectedLanguage = newLanguage
 
-    when {
-        !hasPermission -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "Requesting camera permission...")
+            // ✅ Save selected language to DataStore
+            coroutineScope.launch {
+                preferencesManager.saveLanguage(newLanguage)
+            }
+
+            // ✅ Update TTS language dynamically
+            tts.value?.language = when (newLanguage) {
+                "Malayalam" -> Locale("ml")
+                "Hindi" -> Locale("hi")
+                "Kannada" -> Locale("kn")
+                "English" -> Locale.ENGLISH
+                else -> Locale.ENGLISH
             }
         }
-        !showCamera -> {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(text = "Select Language:")
 
-                DropdownMenuBox(selectedLanguage) { newLanguage ->
-                    selectedLanguage = newLanguage
-                    tts.value?.language = when (newLanguage) {
-                        "Malayalam" -> Locale("ml")
-                        "Hindi" -> Locale("hi")
-                        "Kannada" -> Locale("kn")
-                        else -> Locale.ENGLISH
-                    }
-                }
+        Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Box(
-                    modifier = Modifier
-                        .size(200.dp)
-                        .clip(RoundedCornerShape(16.dp))  // ✅ Fix: clip should be inside Modifier
-                        .background(Color.Black)
-                        .clickable {
-                            tts.value?.speak(
-                                "Starting camera in $selectedLanguage",
-                                TextToSpeech.QUEUE_FLUSH,
-                                null,
-                                null
-                            )
-                            showCamera = true
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = "OPEN CAMERA", color = Color.White)
-                }
-            }
-        }
-        else -> {
-            CameraPreviewScreen()
+        Box(
+            modifier = Modifier
+                .size(200.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.Black)
+                .clickable {
+                    tts.value?.speak(
+                        "Starting camera in $selectedLanguage",
+                        TextToSpeech.QUEUE_FLUSH,
+                        null,
+                        null
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = "OPEN CAMERA", color = Color.White)
         }
     }
 }
+
 
 @Composable
 fun DropdownMenuBox(selectedLanguage: String, onLanguageSelected: (String) -> Unit) {
