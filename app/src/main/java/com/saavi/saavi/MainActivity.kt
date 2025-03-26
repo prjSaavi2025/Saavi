@@ -120,12 +120,14 @@ fun MainScreen() {
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color.Black)
                 .clickable {
-                    tts.speak(
-                        "Starting camera in $selectedLanguage",
-                        TextToSpeech.QUEUE_FLUSH,
-                        null,
-                        null
-                    )
+                    val speechText = when (selectedLanguage) {
+                        "Malayalam" -> "ക്യാമറ ആരംഭിക്കുന്നു"
+                        "Hindi" -> "कैमरा शुरू हो रहा है"
+                        "Kannada" -> "ಕ್ಯಾಮೆರಾ ಪ್ರಾರಂಭವಾಗುತ್ತಿದೆ"
+                        else -> "Starting camera in $selectedLanguage"
+                    }
+
+                    tts.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, null)
                     showCamera = true
                 },
             contentAlignment = Alignment.Center
