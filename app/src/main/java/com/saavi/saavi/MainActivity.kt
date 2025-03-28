@@ -1,4 +1,5 @@
 package com.saavi.saavi
+import com.saavi.saavi.ai.DeepSeekAIHelper
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -27,7 +28,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.saavi.saavi.ai.GeminiAIHelper
 import kotlinx.coroutines.launch
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -197,7 +197,8 @@ fun CameraPreviewScreen(selectedLanguage: String) {
                             bitmap?.let { safeBitmap ->
                                 CoroutineScope(Dispatchers.Main).launch {
                                     try {
-                                        val analysisResult = GeminiAIHelper.analyzeImage(context, safeBitmap)
+                                        val analysisResult = DeepSeekAIHelper.analyzeImage(context, safeBitmap)
+
                                         detectedText = analysisResult
                                         tts.speak(analysisResult, TextToSpeech.QUEUE_FLUSH, null, null)
                                     } catch (e: Exception) {
