@@ -86,6 +86,14 @@ android {
         // to store and retrieve the selected language.
         implementation("androidx.datastore:datastore-preferences:1.1.3")
 
+        // Retrofit for API calls
+        implementation("com.squareup.retrofit2:retrofit:2.9.0")
+        implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+// OkHttp for networking
+        implementation("com.squareup.okhttp3:okhttp:4.9.3")
+
+
 
         testImplementation(libs.junit)
         androidTestImplementation(libs.androidx.junit)
